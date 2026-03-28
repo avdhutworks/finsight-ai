@@ -17,6 +17,15 @@ public class FinSightService {
     private final ChatClient chatClient;
     private final List<String> chunks = new ArrayList<>();
 
+    private static final Map<String, List<String>> CATEGORY_KEYWORDS = Map.of(
+            "Food", List.of("swiggy", "zomato", "zepto", "blinkit", "sweets", "juice", "foods", "chicken", "hotel", "restaurant"),
+            "Shopping", List.of("amazon", "flipkart", "wear", "mobile", "marketplace", "store", "mart", "retail"),
+            "Bills", List.of("medico", "chemist", "hospital", "health", "dental", "clinic", "insurance",
+                    "rent", "electricity", "bill", "recharge", "airtel", "jio", "google india digital"),
+            "Travel", List.of("uber", "ola", "fuel", "petrol", "metro", "irctc"),
+            "Family/Transfer", List.of("parab", "transfer")
+    );
+
     public FinSightService(ChatClient.Builder builder) {
         this.chatClient = builder.build();
     }
@@ -35,13 +44,58 @@ public class FinSightService {
     }
 
     public String sendContentOnAsk(String context, QuestionRequest questionRequest) {
+        String prompt = """
+                        You are a financial assistant.
+
+                        Answer the question ONLY based on the provided transactions.
+                        If answer is not found, say "Not enough data".
+
+                        Transactions:
+                        """ + context + """
+
+                        Question:
+                        """ + questionRequest.question();
         return chatClient
                 .prompt()
-                .user("You are a financial assistant. Based on below data:\n"
-                        + context +
-                        "\nAnswer this question: " + questionRequest.question())
+                .user(prompt)
                 .call()
                 .content();
+    }
+
+    public List<String> findRelevantChunks(String question) {
+        List<String> relevantChunks = new ArrayList<>();
+        String q = question.toLowerCase();
+
+        String detectedCategory = detectCategoryFromQuestion(q);
+        for (String chunk : chunks) {
+            String category = categorize(chunk);
+            if (detectedCategory != null && category.equalsIgnoreCase(detectedCategory)) {
+                relevantChunks.add(chunk);
+            }
+            else if (q.contains("total") || q.contains("spending")) {
+                relevantChunks.add(chunk);
+            }
+        }
+        if (relevantChunks.isEmpty()) {
+            return chunks.subList(0, Math.min(3, chunks.size()));
+        }
+        return relevantChunks;
+    }
+
+    private String detectCategoryFromQuestion(String question) {
+        for (Map.Entry<String, List<String>> entry : CATEGORY_KEYWORDS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (question.contains(keyword)) {
+                    return entry.getKey();
+                }
+            }
+        }
+
+        if (question.contains("food")) return "Food";
+        if (question.contains("shopping")) return "Shopping";
+        if (question.contains("travel")) return "Travel";
+        if (question.contains("bill")) return "Bills";
+        return null;
     }
 
     public Map<String, Double> categorizeSpending() {
@@ -125,41 +179,16 @@ public class FinSightService {
 
     private String categorize(String description) {
         String desc = description.toLowerCase();
-        if (desc.contains("swiggy") || desc.contains("zomato") ||
-                desc.contains("zepto") || desc.contains("blinkit") ||
-                desc.contains("sweets") || desc.contains("juice") ||
-                desc.contains("foods") || desc.contains("chicken") ||
-                desc.contains("hotel") || desc.contains("restaurant")) {
-            return "Food";
+        for (Map.Entry<String, List<String>> entry : CATEGORY_KEYWORDS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (desc.contains(keyword)) {
+                    return entry.getKey();
+                }
+            }
         }
-        if (desc.contains("amazon") || desc.contains("flipkart") ||
-                desc.contains("wear") || desc.contains("mobile") ||
-                desc.contains("marketplace") || desc.contains("store") ||
-                desc.contains("mart") || desc.contains("retail")) {
-            return "Shopping";
-        }
-        if (desc.contains("medico") || desc.contains("chemist") ||
-                desc.contains("hospital") || desc.contains("health") ||
-                desc.contains("dental") || desc.contains("clinic") ||
-                desc.contains("insurance")) {
-            return "Bills";
-        }
-        if (desc.contains("rent") || desc.contains("electricity") ||
-                desc.contains("bill") || desc.contains("recharge") ||
-                desc.contains("airtel") || desc.contains("jio") ||
-                desc.contains("google india digital")) {
-            return "Bills";
-        }
-        if (desc.contains("uber") || desc.contains("ola") ||
-                desc.contains("fuel") || desc.contains("petrol") ||
-                desc.contains("metro") || desc.contains("irctc")) {
-            return "Travel";
-        }
-        if (desc.contains("parab") || desc.contains("transfer") ||
-                desc.contains("upi") && desc.contains("to")) {
+        if (desc.contains("upi") && desc.contains("to")) {
             return "Family/Transfer";
         }
-
         return "Others";
     }
 }
