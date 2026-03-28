@@ -1,23 +1,21 @@
 package com.avdhutworks.finsight_ai.api;
 
 import com.avdhutworks.finsight_ai.api.model.QuestionRequest;
+import com.avdhutworks.finsight_ai.api.model.StatementSummaryResponse;
 import com.avdhutworks.finsight_ai.service.FinSightService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController(value = "/api/v1/finSight")
 public class FinSightController {
 
+    @Autowired
     private FinSightService finSightService;
-    private ChatClient chatClient;
-
-    public FinSightController(FinSightService finSightService, ChatClient.Builder builder) {
-        this.finSightService = finSightService;
-        this.chatClient = builder.build();
-    }
 
     @PostMapping(value = "/upload/pdf", consumes = "multipart/form-data")
     public String uploadAndProcessStatement(@RequestPart("file") MultipartFile file) {
@@ -39,15 +37,28 @@ public class FinSightController {
 
     @PostMapping(value = "/ask", consumes = "application/json")
     public String askQuestion(@RequestBody QuestionRequest questionRequest) {
-
         String context = String.join("\n", finSightService.getChunks());
+        return finSightService.sendContentOnAsk(context, questionRequest);
+    }
 
-        return chatClient
-                .prompt()
-                .user("You are a financial assistant. Based on below data:\n"
-                        + context +
-                        "\nAnswer this question: " + questionRequest.question())
-                .call()
-                .content();
+    @GetMapping(value = "/summary")
+    public StatementSummaryResponse getSummary() {
+
+        Map<String, Double> categoryMap = finSightService.categorizeSpending();
+
+        double total = categoryMap.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .sum();
+
+        String topCategory = categoryMap.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("N/A");
+
+        return new StatementSummaryResponse(
+                total,
+                topCategory,
+                categoryMap
+        );
     }
 }
