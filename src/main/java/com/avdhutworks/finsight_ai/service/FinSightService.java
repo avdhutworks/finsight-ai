@@ -1,9 +1,11 @@
 package com.avdhutworks.finsight_ai.service;
 
 import com.avdhutworks.finsight_ai.api.model.QuestionRequest;
+import com.avdhutworks.finsight_ai.utils.InMemoryVectorStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,6 +17,7 @@ import java.util.Map;
 public class FinSightService {
 
     private final ChatClient chatClient;
+    private InMemoryVectorStore vectorStore;
     private final List<String> chunks = new ArrayList<>();
 
     private static final Map<String, List<String>> CATEGORY_KEYWORDS = Map.of(
@@ -26,8 +29,9 @@ public class FinSightService {
             "Family/Transfer", List.of("parab", "transfer")
     );
 
-    public FinSightService(ChatClient.Builder builder) {
+    public FinSightService(ChatClient.Builder builder, @Autowired InMemoryVectorStore vectorStore) {
         this.chatClient = builder.build();
+        this.vectorStore = vectorStore;
     }
 
     public void storeText(String text) {
@@ -37,10 +41,7 @@ public class FinSightService {
         for (int i = 0; i < text.length(); i += chunkSize) {
             chunks.add(text.substring(i, Math.min(text.length(), i + chunkSize)));
         }
-    }
-
-    public List<String> getChunks() {
-        return chunks;
+        vectorStore.addDocuments(chunks);
     }
 
     public String sendContentOnAsk(String context, QuestionRequest questionRequest) {
@@ -190,5 +191,23 @@ public class FinSightService {
             return "Family/Transfer";
         }
         return "Others";
+    }
+
+    public List<String> getHybridChunks(String question) {
+        List<String> vectorChunks = vectorStore.similaritySearch(question, 5);
+        String detectedCategory = detectCategoryFromQuestion(question);
+        List<String> filtered = new ArrayList<>();
+
+        for (String chunk : vectorChunks) {
+            String category = categorize(chunk);
+            if (detectedCategory == null || category.equalsIgnoreCase(detectedCategory)) {
+                filtered.add(chunk);
+            }
+        }
+
+        if (filtered.isEmpty()) {
+            return vectorChunks;
+        }
+        return filtered;
     }
 }
