@@ -1,5 +1,6 @@
 package com.avdhutworks.finsight_ai.api;
 
+import com.avdhutworks.finsight_ai.api.model.FinancialInsightsResponse;
 import com.avdhutworks.finsight_ai.api.model.StatementSummaryResponse;
 import com.avdhutworks.finsight_ai.service.DocumentService;
 import com.avdhutworks.finsight_ai.service.InsightsService;
@@ -40,6 +41,29 @@ public class InsightsController {
                 total,
                 topCategory,
                 categoryMap
+        );
+    }
+
+    @GetMapping("/insights")
+    public FinancialInsightsResponse getInsights() {
+        List<String> chunks = documentService.getChunks();
+        Map<String, Double> categoryMap =
+                insightsService.calculateCategoryTotals(chunks);
+        Map<String, Double> merchantMap =
+                insightsService.calculateMerchantTotals(chunks);
+        List<Map.Entry<String, Double>> topMerchants =
+                insightsService.getTopMerchants(merchantMap);
+        List<String> ruleInsights =
+                insightsService.generateRuleBasedInsights(categoryMap);
+        String aiInsights =
+                insightsService.generateAiInsights(categoryMap);
+
+        return new FinancialInsightsResponse(
+                categoryMap,
+                merchantMap,
+                topMerchants,
+                ruleInsights,
+                aiInsights
         );
     }
 }
