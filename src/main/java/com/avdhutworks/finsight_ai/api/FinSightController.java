@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController(value = "/api/v1/finSight")
@@ -37,7 +38,8 @@ public class FinSightController {
 
     @PostMapping(value = "/ask", consumes = "application/json")
     public String askQuestion(@RequestBody QuestionRequest questionRequest) {
-        String context = String.join("\n", finSightService.getChunks());
+        List<String> relevantChunks = finSightService.findRelevantChunks(questionRequest.question());
+        String context = String.join("\n", relevantChunks);
         return finSightService.sendContentOnAsk(context, questionRequest);
     }
 
