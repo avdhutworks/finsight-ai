@@ -34,13 +34,18 @@ public class RagService {
 
     public String ask(String context, String question) {
         String prompt = """
-                You are a financial assistant.
+            You are a financial assistant.
 
-                Answer ONLY from below data.
+            STRICT RULES:
+            - Answer ONLY from provided data
+            - Do NOT guess
+            - If data is missing, say: Not enough data
+            - Keep answer short (1-2 lines)
 
-                """ + context + """
+            Transactions:
+            """ + context + """
 
-                Question: """ + question;
+            Question: """ + question;
 
         return chatClient.prompt()
                 .user(prompt)
