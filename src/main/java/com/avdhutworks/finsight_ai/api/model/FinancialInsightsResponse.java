@@ -6,7 +6,7 @@ import java.util.Map;
 public record FinancialInsightsResponse(
         Map<String, Double> categoryTotals,
         Map<String, Double> merchantTotals,
-        List<Map.Entry<String, Double>> topMerchants,
+        List<Merchant> topMerchants,
         List<String> ruleInsights,
         String aiInsights
 ) {

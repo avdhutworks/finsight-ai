@@ -1,5 +1,6 @@
 package com.avdhutworks.finsight_ai.service;
 
+import com.avdhutworks.finsight_ai.api.model.Merchant;
 import com.avdhutworks.finsight_ai.api.model.Transaction;
 import com.avdhutworks.finsight_ai.utils.MerchantExtractor;
 import com.avdhutworks.finsight_ai.utils.TransactionParser;
@@ -54,10 +55,11 @@ public class InsightsService {
         return merchantMap;
     }
 
-    public List<Map.Entry<String, Double>> getTopMerchants(Map<String, Double> map) {
+    public List<Merchant> getTopMerchants(Map<String, Double> map) {
         return map.entrySet().stream()
                 .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
                 .limit(5)
+                .map(entry -> new Merchant(entry.getKey(), entry.getValue()))
                 .toList();
     }
 
