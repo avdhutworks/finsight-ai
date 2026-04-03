@@ -48,8 +48,16 @@ public class FinSightController {
 
     @PostMapping(value = "/ask", consumes = "application/json")
     public String askQuestion(@RequestBody QuestionRequest questionRequest) {
-        List<String> chunks = ragService.getHybridChunks(questionRequest.question());
+        String question = questionRequest.question();
+        String structuredAnswer = insightsService.answerStructuredQuestion(question);
+
+        if (structuredAnswer != null) {
+            return structuredAnswer;
+        }
+
+        List<String> chunks = ragService.getHybridChunks(question);
         String context = String.join("\n", chunks);
-        return ragService.ask(context, questionRequest.question());
+
+        return ragService.ask(context, question);
     }
 }
