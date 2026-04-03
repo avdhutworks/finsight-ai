@@ -16,11 +16,13 @@ import java.util.Map;
 public class InsightsService {
     private final CategorizationService categorizationService;
     private final ChatClient chatClient;
+    private final DocumentService documentService;
     private final TransactionParser parser = new TransactionParser();
     private final MerchantExtractor merchantExtractor = new MerchantExtractor();
 
-    public InsightsService(CategorizationService categorizationService, ChatClient.Builder builder) {
+    public InsightsService(CategorizationService categorizationService, DocumentService documentService, ChatClient.Builder builder) {
         this.categorizationService = categorizationService;
+        this.documentService = documentService;
         this.chatClient = builder.build();
     }
 
@@ -84,18 +86,62 @@ public class InsightsService {
     public String generateAiInsights(Map<String, Double> categoryMap) {
         String prompt = """
             You are a financial advisor.
-
-            Analyze the spending data and provide:
-            - Key observations
-            - Saving suggestions
-
-            Keep response short and practical.
-
+            
+            Based on the spending data, generate:
+            
+            1. 2-3 key insights
+            2. 2-3 saving suggestions
+            
+            STRICT RULES:
+            - Keep response VERY SHORT
+            - Each point must be one line only
+            - No paragraphs
+            - No explanations
+            - Use bullet points
+            - Focus only on useful, actionable insights
+            
+            Format:
+            
+            Insights:
+            - ...
+            - ...
+            
+            Suggestions:
+            - ...
+            - ...
+            
             Data:
             """ + categoryMap.toString();
         return chatClient.prompt()
                 .user(prompt)
                 .call()
                 .content();
+    }
+
+    public String answerStructuredQuestion(String question) {
+        Map<String, Double> categoryMap =
+                calculateCategoryTotals(documentService.getChunks());
+        String q = question.toLowerCase();
+        if (q.contains("food")) {
+            return buildResponse("Food", categoryMap);
+        }
+        if (q.contains("shopping")) {
+            return buildResponse("Shopping", categoryMap);
+        }
+        if (q.contains("travel")) {
+            return buildResponse("Travel", categoryMap);
+        }
+        if (q.contains("bill") || q.contains("chemist") || q.contains("medical")) {
+            return buildResponse("Bills", categoryMap);
+        }
+        return null; // fallback to LLM
+    }
+
+    private String buildResponse(String category, Map<String, Double> map) {
+        double amount = map.getOrDefault(category, 0.0);
+        if (amount == 0) {
+            return "No spending found for " + category + ".";
+        }
+        return "You spent ₹" + Math.round(amount) + " on " + category + ".";
     }
 }
